@@ -21,6 +21,7 @@ import bisq.core.dao.DaoSetupService;
 import bisq.core.dao.monitoring.model.DaoStateBlock;
 import bisq.core.dao.monitoring.model.DaoStateHash;
 import bisq.core.dao.monitoring.model.UtxoMismatch;
+import bisq.core.dao.monitoring.network.Checkpoint;
 import bisq.core.dao.monitoring.network.DaoStateNetworkService;
 import bisq.core.dao.monitoring.network.messages.GetDaoStateHashesRequest;
 import bisq.core.dao.monitoring.network.messages.NewDaoStateHashMessage;
@@ -37,14 +38,22 @@ import bisq.network.p2p.seed.SeedNodeRepository;
 
 import bisq.common.UserThread;
 import bisq.common.crypto.Hash;
+import bisq.common.storage.FileManager;
+import bisq.common.storage.Storage;
+import bisq.common.util.Utilities;
 
 import javax.inject.Inject;
+import javax.inject.Named;
 
 import org.apache.commons.lang3.ArrayUtils;
 
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 
+import java.io.File;
+
+import java.util.Arrays;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
@@ -80,6 +89,8 @@ public class DaoStateMonitoringService implements DaoSetupService, DaoStateListe
 
     public interface Listener {
         void onChangeAfterBatchProcessing();
+
+        void onCheckpointFail();
     }
 
     private final DaoStateService daoStateService;
@@ -101,6 +112,12 @@ public class DaoStateMonitoringService implements DaoSetupService, DaoStateListe
     @Getter
     private ObservableList<UtxoMismatch> utxoMismatches = FXCollections.observableArrayList();
 
+    private List<Checkpoint> checkpoints = Arrays.asList(
+            new Checkpoint(586920, Utilities.decodeFromHex("523aaad4e760f6ac6196fec1b3ec9a2f42e5b272"))
+    );
+    private boolean checkpointFailed;
+
+    private final File storageDir;
 
     ///////////////////////////////////////////////////////////////////////////////////////////
     // Constructor
@@ -110,10 +127,12 @@ public class DaoStateMonitoringService implements DaoSetupService, DaoStateListe
     public DaoStateMonitoringService(DaoStateService daoStateService,
                                      DaoStateNetworkService daoStateNetworkService,
                                      GenesisTxInfo genesisTxInfo,
-                                     SeedNodeRepository seedNodeRepository) {
+                                     SeedNodeRepository seedNodeRepository,
+                                     @Named(Storage.STORAGE_DIR) File storageDir) {
         this.daoStateService = daoStateService;
         this.daoStateNetworkService = daoStateNetworkService;
         this.genesisTxInfo = genesisTxInfo;
+        this.storageDir = storageDir;
         seedNodeAddresses = seedNodeRepository.getSeedNodeAddresses().stream()
                 .map(NodeAddress::getFullAddress)
                 .collect(Collectors.toSet());
@@ -154,6 +173,8 @@ public class DaoStateMonitoringService implements DaoSetupService, DaoStateListe
 
     @Override
     public void onDaoStateChanged(Block block) {
+        verifyCheckpoint();
+
         long genesisTotalSupply = daoStateService.getGenesisTotalSupply().value;
         long compensationIssuance = daoStateService.getTotalIssuedAmount(IssuanceType.COMPENSATION);
         long reimbursementIssuance = daoStateService.getTotalIssuedAmount(IssuanceType.REIMBURSEMENT);
@@ -164,6 +185,65 @@ public class DaoStateMonitoringService implements DaoSetupService, DaoStateListe
 
         if (sumBsq != sumUtxo) {
             utxoMismatches.add(new UtxoMismatch(block.getHeight(), sumUtxo, sumBsq));
+        }
+    }
+
+    private void verifyCheckpoint() {
+        // Checkpoint
+        Checkpoint nextCheckpoint = checkpoints.stream()
+                .filter(checkpoint -> !checkpoint.isPassed())
+                .findFirst()
+                .orElse(null);
+        if (nextCheckpoint != null && daoStateHashChain.getLast().getHeight() >= nextCheckpoint.getHeight()) {
+            Iterator<DaoStateHash> it = daoStateHashChain.descendingIterator();
+            while (it.hasNext()) {
+                DaoStateHash hash = it.next();
+                if (hash.getHeight() == nextCheckpoint.getHeight()) {
+                    if (Arrays.equals(hash.getHash(), nextCheckpoint.getHash())) {
+                        nextCheckpoint.setPassed(true);
+                        log.info("Passed checkpoint {}", nextCheckpoint.toString());
+                    } else {
+                        if (checkpointFailed) {
+                            return;
+                        }
+                        checkpointFailed = true;
+                        try {
+                            // Delete state and stop
+                            long currentTime = System.currentTimeMillis();
+                            String backupDirName = "out_of_sync_dao_data";
+                            String newFileName = "DaoStateStore_" + currentTime;
+                            File corrupted = new File(storageDir, "DaoStateStore");
+                            if (corrupted.exists()) {
+                                FileManager.removeAndBackupFile(storageDir, corrupted, newFileName, backupDirName);
+                            }
+
+                            newFileName = "BlindVoteStore_" + currentTime;
+                            corrupted = new File(storageDir, "BlindVoteStore");
+                            if (corrupted.exists()) {
+                                FileManager.removeAndBackupFile(storageDir, corrupted, newFileName, backupDirName);
+                            }
+
+                            newFileName = "ProposalStore_" + currentTime;
+                            corrupted = new File(storageDir, "ProposalStore");
+                            if (corrupted.exists()) {
+                                FileManager.removeAndBackupFile(storageDir, corrupted, newFileName, backupDirName);
+                            }
+
+                            newFileName = "BallotList_" + currentTime;
+                            corrupted = new File(storageDir, "BallotList");
+                            if (corrupted.exists()) {
+                                FileManager.removeAndBackupFile(storageDir, corrupted, newFileName, backupDirName);
+                            }
+                            listeners.forEach(Listener::onCheckpointFail);
+                            log.error("Failed checkpoint {}", nextCheckpoint.toString());
+                        } catch (Throwable t) {
+                            t.printStackTrace();
+                            log.error(t.toString());
+                        }
+                    }
+                    break;
+                }
+            }
         }
     }
 
@@ -291,7 +371,8 @@ public class DaoStateMonitoringService implements DaoSetupService, DaoStateListe
         }
     }
 
-    private boolean processPeersDaoStateHash(DaoStateHash daoStateHash, Optional<NodeAddress> peersNodeAddress, boolean notifyListeners) {
+    private boolean processPeersDaoStateHash(DaoStateHash daoStateHash, Optional<NodeAddress> peersNodeAddress,
+                                             boolean notifyListeners) {
         AtomicBoolean changed = new AtomicBoolean(false);
         AtomicBoolean inConflictWithNonSeedNode = new AtomicBoolean(this.isInConflictWithNonSeedNode);
         AtomicBoolean inConflictWithSeedNode = new AtomicBoolean(this.isInConflictWithSeedNode);

@@ -117,6 +117,13 @@ public class DaoStateMonitorView extends StateMonitorView<DaoStateHash, DaoState
         }
     }
 
+    @Override
+    public void onCheckpointFail() {
+        new Popup<>().attention(Res.get("dao.monitor.daoState.checkpoint.popup"))
+                .useShutDownButton()
+                .hideCloseButton()
+                .show();
+    }
 
     ///////////////////////////////////////////////////////////////////////////////////////////
     // Implementation abstract methods
