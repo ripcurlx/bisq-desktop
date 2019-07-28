@@ -17,6 +17,7 @@
 
 package bisq.core.dao.monitoring;
 
+import bisq.core.app.AppOptionKeys;
 import bisq.core.dao.DaoSetupService;
 import bisq.core.dao.monitoring.model.DaoStateBlock;
 import bisq.core.dao.monitoring.model.DaoStateHash;
@@ -116,6 +117,7 @@ public class DaoStateMonitoringService implements DaoSetupService, DaoStateListe
             new Checkpoint(586920, Utilities.decodeFromHex("523aaad4e760f6ac6196fec1b3ec9a2f42e5b272"))
     );
     private boolean checkpointFailed;
+    private boolean ignoreDevMsg;
 
     private final File storageDir;
 
@@ -128,11 +130,13 @@ public class DaoStateMonitoringService implements DaoSetupService, DaoStateListe
                                      DaoStateNetworkService daoStateNetworkService,
                                      GenesisTxInfo genesisTxInfo,
                                      SeedNodeRepository seedNodeRepository,
-                                     @Named(Storage.STORAGE_DIR) File storageDir) {
+                                     @Named(Storage.STORAGE_DIR) File storageDir,
+                                     @Named(AppOptionKeys.IGNORE_DEV_MSG_KEY) boolean ignoreDevMsg) {
         this.daoStateService = daoStateService;
         this.daoStateNetworkService = daoStateNetworkService;
         this.genesisTxInfo = genesisTxInfo;
         this.storageDir = storageDir;
+        this.ignoreDevMsg = ignoreDevMsg;
         seedNodeAddresses = seedNodeRepository.getSeedNodeAddresses().stream()
                 .map(NodeAddress::getFullAddress)
                 .collect(Collectors.toSet());
@@ -173,7 +177,9 @@ public class DaoStateMonitoringService implements DaoSetupService, DaoStateListe
 
     @Override
     public void onDaoStateChanged(Block block) {
-        verifyCheckpoint();
+        if (!ignoreDevMsg) {
+            verifyCheckpoint();
+        }
 
         long genesisTotalSupply = daoStateService.getGenesisTotalSupply().value;
         long compensationIssuance = daoStateService.getTotalIssuedAmount(IssuanceType.COMPENSATION);
