@@ -12,4 +12,4 @@ jobs:
             -   uses: estrada9166/labeler@v1
                 with:
                     GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
-                    CONFIG_PATH: pr-labeler.yml
+                    CONFIG_PATH: labeler-config.yml
