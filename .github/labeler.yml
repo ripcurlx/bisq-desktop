@@ -1,4 +1,4 @@
 # Add 'in:altcoins' to any file changes within 'assets' folder
-in:altcoins: assets/*
-duplicate: assets/*
-bug: /*
+in:altcoins: assets/**
+duplicate: assets/**
+bug: /**
