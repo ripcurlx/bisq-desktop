@@ -1,0 +1,16 @@
+name: Pull Request Labeler
+on: 
+    pull_request_review:
+    push:
+        branches: master
+
+jobs:
+    label:
+
+        runs-on: ubuntu-latest
+
+        steps:
+            -   uses: estrada9166/labeler@v1
+                with:
+                    GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+                    CONFIG_PATH: .github/pr-labeler-config.yml
