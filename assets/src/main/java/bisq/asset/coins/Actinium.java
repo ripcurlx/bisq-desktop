@@ -26,8 +26,9 @@ public class Actinium extends Coin {
     public Actinium() {
         super("Actinium", "ACM", new Base58BitcoinAddressValidator(new ActiniumParams()));
     }
-
-
+    
+    // upsi
+    
     public static class ActiniumParams extends NetworkParametersAdapter {
 
         public ActiniumParams() {
