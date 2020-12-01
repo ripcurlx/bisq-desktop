@@ -36,8 +36,6 @@ import bisq.network.p2p.network.MessageListener;
 import bisq.network.p2p.network.NetworkNode;
 import bisq.network.p2p.network.TorNetworkNode;
 
-import bisq.common.app.Version;
-import bisq.common.config.BaseCurrencyNetwork;
 import bisq.common.persistence.PersistenceManager;
 import bisq.common.proto.network.NetworkEnvelope;
 
@@ -79,7 +77,6 @@ public abstract class P2PSeedNodeSnapshotBase extends Metric implements MessageL
 
     private static final String HOSTS = "run.hosts";
     private static final String TOR_PROXY_PORT = "run.torProxyPort";
-    private static final String DATABASE_DIR = "run.dbDir";
     final Map<NodeAddress, Statistics<?>> bucketsPerHost = new ConcurrentHashMap<>();
     private final ThreadGate gate = new ThreadGate();
     protected final Set<byte[]> hashes = new TreeSet<>(Arrays::compare);
@@ -111,24 +108,25 @@ public abstract class P2PSeedNodeSnapshotBase extends Metric implements MessageL
     public void configure(Properties properties) {
         super.configure(properties);
 
-        if (hashes.isEmpty() && configuration.getProperty(DATABASE_DIR) != null) {
-            String absPath = new File("").getAbsolutePath();
-            File dir = new File(absPath, configuration.getProperty(DATABASE_DIR));
-            if (!dir.exists()) {
-                if (!dir.mkdir()) {
-                    log.error("Make dir failed. Path: {}", dir);
+        if (hashes.isEmpty()) {
+            File metricsDir = new File(Monitor.getAppDir(), "metric_" + getName());
+            if (!metricsDir.exists()) {
+                if (!metricsDir.mkdir()) {
+                    log.error("Make metricsDir failed. Path: {}", metricsDir);
                 }
             }
-            String networkPostfix = "_" + BaseCurrencyNetwork.values()[Version.getBaseCurrencyNetwork()].toString();
+            log.error("metricsDir " + metricsDir.getAbsolutePath());
             try {
                 CorePersistenceProtoResolver persistenceProtoResolver = new CorePersistenceProtoResolver(null, null);
 
                 //TODO will not work with historical data... should be refactored to re-use code for reading resource files
                 TradeStatistics3Store tradeStatistics3Store = new TradeStatistics3Store();
-                PersistenceManager<TradeStatistics3Store> tradeStatistics3PersistenceManager = new PersistenceManager<>(dir,
+                PersistenceManager<TradeStatistics3Store> tradeStatistics3PersistenceManager = new PersistenceManager<>(metricsDir,
                         persistenceProtoResolver, null);
+                String fileName = getName() + "_" + tradeStatistics3Store.getDefaultStorageFileName();
+                log.error("fileName " + fileName);
                 tradeStatistics3PersistenceManager.initialize(tradeStatistics3Store,
-                        tradeStatistics3Store.getDefaultStorageFileName() + networkPostfix,
+                        fileName,
                         PersistenceManager.Source.NETWORK);
                 TradeStatistics3Store persistedTradeStatistics3Store = tradeStatistics3PersistenceManager.getPersisted();
                 if (persistedTradeStatistics3Store != null) {
@@ -138,10 +136,11 @@ public abstract class P2PSeedNodeSnapshotBase extends Metric implements MessageL
                         .map(byteArray -> byteArray.bytes).collect(Collectors.toSet()));
 
                 AccountAgeWitnessStore accountAgeWitnessStore = new AccountAgeWitnessStore();
-                PersistenceManager<AccountAgeWitnessStore> accountAgeWitnessPersistenceManager = new PersistenceManager<>(dir,
+                PersistenceManager<AccountAgeWitnessStore> accountAgeWitnessPersistenceManager = new PersistenceManager<>(metricsDir,
                         persistenceProtoResolver, null);
+                fileName = getName() + "_" + accountAgeWitnessStore.getDefaultStorageFileName();
                 accountAgeWitnessPersistenceManager.initialize(accountAgeWitnessStore,
-                        accountAgeWitnessStore.getDefaultStorageFileName() + networkPostfix,
+                        fileName,
                         PersistenceManager.Source.NETWORK);
                 AccountAgeWitnessStore persistedAccountAgeWitnessStore = accountAgeWitnessPersistenceManager.getPersisted();
                 if (persistedAccountAgeWitnessStore != null) {
@@ -151,7 +150,7 @@ public abstract class P2PSeedNodeSnapshotBase extends Metric implements MessageL
                         .map(byteArray -> byteArray.bytes).collect(Collectors.toSet()));
             } catch (NullPointerException e) {
                 // in case there is no store file
-                log.error("There is no storage file where there should be one: {}", dir.getAbsolutePath());
+                log.error("There is no storage file where there should be one: {}", metricsDir.getAbsolutePath());
             }
         }
     }

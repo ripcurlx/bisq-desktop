@@ -63,6 +63,7 @@ import sun.misc.Signal;
  */
 @Slf4j
 public class Monitor {
+    @Getter
     public static File appDir;
     @Getter
     public static File torDir;

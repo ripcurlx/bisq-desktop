@@ -75,7 +75,7 @@ public class P2PNetworkLoad extends Metric implements MessageListener, SetupList
     private static final String MAX_CONNECTIONS = "run.maxConnections";
     private static final String HISTORY_SIZE = "run.historySize";
     private NetworkNode networkNode;
-    private final File torHiddenServiceDir = new File("metric_" + getName());
+    private final String torHiddenServiceDirName = "metric_" + getName();
     private final ThreadGate hsReady = new ThreadGate();
     private final Map<String, Counter> buckets = new ConcurrentHashMap<>();
 
@@ -113,8 +113,7 @@ public class P2PNetworkLoad extends Metric implements MessageListener, SetupList
             // prepare the gate
             hsReady.engage();
 
-            String absPath = new File("").getAbsolutePath();
-            File torHiddenServiceDirAbs = new File(absPath, this.torHiddenServiceDir.getPath());
+            File torHiddenServiceDirAbs = new File(Monitor.getTorDir(), torHiddenServiceDirName);
             if (!torHiddenServiceDirAbs.exists()) {
                 if (!torHiddenServiceDirAbs.mkdir()) {
                     log.error("Make dir failed. Path: {}", torHiddenServiceDirAbs);
