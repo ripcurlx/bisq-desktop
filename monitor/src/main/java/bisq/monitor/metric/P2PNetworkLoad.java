@@ -74,6 +74,7 @@ public class P2PNetworkLoad extends Metric implements MessageListener, SetupList
     private NetworkNode networkNode;
     private final String torHiddenServiceDirName = "metric_" + getName();
     private final ThreadGate hsReady = new ThreadGate();
+    //// TODO replace Counter with AtomicInteger
     private final Map<String, Counter> buckets = new ConcurrentHashMap<>();
 
     private long lastRun = 0;
@@ -164,9 +165,7 @@ public class P2PNetworkLoad extends Metric implements MessageListener, SetupList
         super(reporter);
     }
 
-    /**
-     * Efficient way to count message occurrences.
-     */
+    // TODO replace with AtomicInteger
     private static class Counter {
         private int value = 1;
 
