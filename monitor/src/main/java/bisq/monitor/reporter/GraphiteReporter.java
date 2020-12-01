@@ -32,16 +32,24 @@ import com.google.common.base.Charsets;
 import java.net.Socket;
 
 import java.io.IOException;
+import java.io.OutputStream;
 
 import java.util.HashMap;
 import java.util.Map;
+
+import lombok.extern.slf4j.Slf4j;
+
+import javax.annotation.Nullable;
 
 /**
  * Reports our findings to a graphite service.
  *
  * @author Florian Reimair
  */
+@Slf4j
 public class GraphiteReporter extends Reporter {
+    @Nullable
+    private Socket socket;
 
     @Override
     public void report(long value, String prefix) {
@@ -76,27 +84,39 @@ public class GraphiteReporter extends Reporter {
 
     @Override
     public void report(String key, String value, String timeInMilliseconds, String prefix) {
+        log.info("report called with params: key={}, value={}, timeInMilliseconds={}, prefix={}", key, value, timeInMilliseconds, prefix);
         // https://graphite.readthedocs.io/en/latest/feeding-carbon.html
         String report = "bisq" + (Version.getBaseCurrencyNetwork() != 0 ? "-" + BaseCurrencyNetwork.values()[Version.getBaseCurrencyNetwork()].getNetwork() : "")
                 + (prefix.isEmpty() ? "" : "." + prefix)
                 + (key.isEmpty() ? "" : "." + key)
                 + " " + value + " " + Long.parseLong(timeInMilliseconds) / 1000 + "\n";
 
+        if (socket == null) {
+            createSocket();
+        }
+        if (socket != null) {
+            try (OutputStream outputStream = socket.getOutputStream()) {
+                outputStream.write(report.getBytes(Charsets.UTF_8));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        } else {
+            log.debug("No socket setup. That might be expected for dev setup.");
+        }
+    }
+
+    protected void createSocket() {
         try {
             NodeAddress nodeAddress = OnionParser.getNodeAddress(configuration.getProperty("serviceUrl"));
-            Socket socket;
-            if (nodeAddress.getFullAddress().contains(".onion"))
+            if (nodeAddress.getFullAddress().contains(".onion")) {
                 socket = new TorSocket(nodeAddress.getHostName(), nodeAddress.getPort());
-            else
+            } else {
                 socket = new Socket(nodeAddress.getHostName(), nodeAddress.getPort());
-
-            socket.getOutputStream().write(report.getBytes(Charsets.UTF_8));
-            socket.close();
+            }
         } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+            //e.printStackTrace();
+            log.debug("Cannot create socket. That might be expected for dev setup.");
         }
-
     }
 
     @Override
