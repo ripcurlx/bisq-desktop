@@ -275,7 +275,9 @@ public class P2PSeedNodeSnapshot extends P2PSeedNodeSnapshotBase {
 
                 //hashes.add(bytes);
 
-                hashes.add(persistableNetworkPayload.getHash());
+                if (persistableNetworkPayload != null) {
+                    hashes.add(persistableNetworkPayload.getHash());
+                }
             });
 
             bucketsPerHost.put(connection.getPeersNodeAddressProperty().getValue(), result);

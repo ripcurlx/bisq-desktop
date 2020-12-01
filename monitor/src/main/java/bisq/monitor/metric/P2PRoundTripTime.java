@@ -90,7 +90,10 @@ public class P2PRoundTripTime extends P2PSeedNodeSnapshotBase {
 
             measurements.putIfAbsent(connection.getPeersNodeAddressProperty().getValue(), new Statistics());
 
-            measurements.get(connection.getPeersNodeAddressProperty().getValue()).log(networkEnvelope);
+            Statistics statistics = measurements.get(connection.getPeersNodeAddressProperty().getValue());
+            if (statistics != null) {
+                statistics.log(networkEnvelope);
+            }
 
             connection.shutDown(CloseConnectionReason.APP_SHUT_DOWN);
             return true;
