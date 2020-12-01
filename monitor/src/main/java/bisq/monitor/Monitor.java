@@ -32,12 +32,15 @@ import bisq.monitor.reporter.GraphiteReporter;
 import bisq.common.UserThread;
 import bisq.common.app.Capabilities;
 import bisq.common.app.Capability;
+import bisq.common.app.Log;
 import bisq.common.util.Utilities;
 
 import org.berndpruenster.netlayer.tor.NativeTor;
 import org.berndpruenster.netlayer.tor.Tor;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+
+import java.nio.file.Paths;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -102,6 +105,8 @@ public class Monitor {
         torDir = new File(appDir, "tor");
         log.info("App dir: {}", appDir);
 
+        setupLog();
+
         setupUserThread();
 
         setupCapabilities();
@@ -138,6 +143,13 @@ public class Monitor {
                 e.printStackTrace();
             }
         });
+    }
+
+    private void setupLog() {
+        String logPath = Paths.get(appDir.getPath(), "monitor").toString();
+        Log.setup(logPath);
+        log.info("Log files under: {}", logPath);
+        Utilities.printSysInfo();
     }
 
     private void setupShutDownHandlers() {
