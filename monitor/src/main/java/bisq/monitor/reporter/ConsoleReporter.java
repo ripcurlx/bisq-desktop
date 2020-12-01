@@ -25,11 +25,14 @@ import bisq.common.config.BaseCurrencyNetwork;
 import java.util.HashMap;
 import java.util.Map;
 
+import lombok.extern.slf4j.Slf4j;
+
 /**
  * A simple console reporter.
  *
  * @author Florian Reimair
  */
+@Slf4j
 public class ConsoleReporter extends Reporter {
 
     @Override
@@ -57,7 +60,7 @@ public class ConsoleReporter extends Reporter {
 
     @Override
     public void report(String key, String value, String timestamp, String prefix) {
-        System.err.println("Report: bisq" + (Version.getBaseCurrencyNetwork() != 0 ? "-" + BaseCurrencyNetwork.values()[Version.getBaseCurrencyNetwork()].getNetwork() : "")
+        log.info("Report: bisq" + (Version.getBaseCurrencyNetwork() != 0 ? "-" + BaseCurrencyNetwork.values()[Version.getBaseCurrencyNetwork()].getNetwork() : "")
                 + (prefix.isEmpty() ? "" : "." + prefix)
                 + (key.isEmpty() ? "" : "." + key)
                 + " " + value + " " + timestamp);
