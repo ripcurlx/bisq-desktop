@@ -49,12 +49,9 @@ import java.time.Clock;
 
 import java.io.File;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -74,37 +71,12 @@ public class P2PNetworkLoad extends Metric implements MessageListener, SetupList
 
     private static final String TOR_PROXY_PORT = "run.torProxyPort";
     private static final String MAX_CONNECTIONS = "run.maxConnections";
-    private static final String HISTORY_SIZE = "run.historySize";
     private NetworkNode networkNode;
     private final String torHiddenServiceDirName = "metric_" + getName();
     private final ThreadGate hsReady = new ThreadGate();
     private final Map<String, Counter> buckets = new ConcurrentHashMap<>();
 
-    /**
-     * Buffers the last X message we received. New messages will only be logged in case
-     * the message isn't already in the history. Note that the oldest message hashes are
-     * dropped to record newer hashes.
-     */
-    private Map<Integer, Object> history;
     private long lastRun = 0;
-
-    /**
-     * History implementation using a {@link LinkedHashMap} and its
-     * {@link LinkedHashMap#removeEldestEntry(Map.Entry)} option.
-     */
-    private static class FixedSizeHistoryTracker<K, V> extends LinkedHashMap<K, V> {
-        final int historySize;
-
-        FixedSizeHistoryTracker(int historySize) {
-            super(historySize, 10, true);
-            this.historySize = historySize;
-        }
-
-        @Override
-        protected boolean removeEldestEntry(Map.Entry eldest) {
-            return size() > historySize;
-        }
-    }
 
     @Override
     protected void execute() {
@@ -192,13 +164,6 @@ public class P2PNetworkLoad extends Metric implements MessageListener, SetupList
         super(reporter);
     }
 
-    @Override
-    public void configure(Properties properties) {
-        super.configure(properties);
-
-        history = Collections.synchronizedMap(new FixedSizeHistoryTracker<>(Integer.parseInt(configuration.getProperty(HISTORY_SIZE, "200"))));
-    }
-
     /**
      * Efficient way to count message occurrences.
      */
@@ -221,13 +186,10 @@ public class P2PNetworkLoad extends Metric implements MessageListener, SetupList
     @Override
     public void onMessage(NetworkEnvelope networkEnvelope, Connection connection) {
         if (networkEnvelope instanceof BroadcastMessage) {
-            if (history.get(networkEnvelope.hashCode()) == null) {
-                history.put(networkEnvelope.hashCode(), null);
-                String key = networkEnvelope.getClass().getSimpleName();
-                buckets.putIfAbsent(key, new Counter());
-                Counter counter = buckets.get(key);
-                counter.increment();
-            }
+            String key = networkEnvelope.getClass().getSimpleName();
+            buckets.putIfAbsent(key, new Counter());
+            Counter counter = buckets.get(key);
+            counter.increment();
         }
     }
 
