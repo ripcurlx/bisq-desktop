@@ -35,6 +35,7 @@ import bisq.network.p2p.network.TorNetworkNode;
 import bisq.network.p2p.peers.PeerManager;
 import bisq.network.p2p.peers.keepalive.KeepAliveManager;
 import bisq.network.p2p.peers.peerexchange.PeerExchangeManager;
+import bisq.network.p2p.peers.peerexchange.PeerList;
 import bisq.network.p2p.storage.messages.BroadcastMessage;
 
 import bisq.common.ClockWatcher;
@@ -137,12 +138,13 @@ public class P2PNetworkLoad extends Metric implements MessageListener, SetupList
                 CorePersistenceProtoResolver persistenceProtoResolver = new CorePersistenceProtoResolver(null,
                         networkProtoResolver);
                 DefaultSeedNodeRepository seedNodeRepository = new DefaultSeedNodeRepository(config);
+                File dir = new File(Monitor.getAppDir(), "db");
+                if (!dir.exists()) {
+                    dir.mkdir();
+                }
+                PersistenceManager<PeerList> persistenceManager = new PersistenceManager<>(dir, persistenceProtoResolver, corruptedStorageFileHandler);
                 PeerManager peerManager = new PeerManager(networkNode, seedNodeRepository, new ClockWatcher(),
-                        new PersistenceManager<>(torHiddenServiceDirAbs, persistenceProtoResolver, corruptedStorageFileHandler), maxConnections);
-
-                // init file storage
-                peerManager.readPersisted(() -> {
-                });
+                        persistenceManager, maxConnections);
 
                 PeerExchangeManager peerExchangeManager = new PeerExchangeManager(networkNode, seedNodeRepository,
                         peerManager);
