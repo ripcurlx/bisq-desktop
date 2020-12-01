@@ -18,13 +18,10 @@
 package bisq.monitor.metric;
 
 import bisq.monitor.Metric;
-import bisq.monitor.Monitor;
 import bisq.monitor.Reporter;
 import bisq.monitor.ThreadGate;
 
 import org.berndpruenster.netlayer.tor.HiddenServiceSocket;
-
-import java.io.File;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -39,7 +36,7 @@ public class TorHiddenServiceStartupTime extends Metric {
 
     private static final String SERVICE_PORT = "run.servicePort";
     private static final String LOCAL_PORT = "run.localPort";
-    private final String hiddenServiceDirectory = "metric_" + getName();
+    private final String hiddenServiceDirName = "metric_" + getName();
     private final ThreadGate gate = new ThreadGate();
 
     public TorHiddenServiceStartupTime(Reporter reporter) {
@@ -53,8 +50,11 @@ public class TorHiddenServiceStartupTime extends Metric {
         int localPort = Integer.parseInt(configuration.getProperty(LOCAL_PORT, "9998"));
         int servicePort = Integer.parseInt(configuration.getProperty(SERVICE_PORT, "9999"));
 
+        // Does not reflect Bisq use case where we reuse the HS and get faster connections
+        /*
         // clear directory so we get a new onion address every time
-        new File(Monitor.TOR_WORKING_DIR + "/" + hiddenServiceDirectory).delete();
+        new File(Monitor.getTorDir() + "/" + hiddenServiceDirName).delete();
+        */
 
         log.debug("creating the hidden service");
 
@@ -64,7 +64,7 @@ public class TorHiddenServiceStartupTime extends Metric {
         // the range of tenth of seconds.
         long start = System.currentTimeMillis();
 
-        HiddenServiceSocket hiddenServiceSocket = new HiddenServiceSocket(localPort, hiddenServiceDirectory,
+        HiddenServiceSocket hiddenServiceSocket = new HiddenServiceSocket(localPort, hiddenServiceDirName,
                 servicePort);
         hiddenServiceSocket.addReadyListener(socket -> {
             // stop the timer and report
