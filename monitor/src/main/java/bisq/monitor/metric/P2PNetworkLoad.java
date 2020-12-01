@@ -221,14 +221,12 @@ public class P2PNetworkLoad extends Metric implements MessageListener, SetupList
     @Override
     public void onMessage(NetworkEnvelope networkEnvelope, Connection connection) {
         if (networkEnvelope instanceof BroadcastMessage) {
-            try {
-                if (history.get(networkEnvelope.hashCode()) == null) {
-                    history.put(networkEnvelope.hashCode(), null);
-                    buckets.get(networkEnvelope.getClass().getSimpleName()).increment();
-                }
-            } catch (NullPointerException e) {
-                // use exception handling because we hardly ever need to add a fresh bucket
-                buckets.put(networkEnvelope.getClass().getSimpleName(), new Counter());
+            if (history.get(networkEnvelope.hashCode()) == null) {
+                history.put(networkEnvelope.hashCode(), null);
+                String key = networkEnvelope.getClass().getSimpleName();
+                buckets.putIfAbsent(key, new Counter());
+                Counter counter = buckets.get(key);
+                counter.increment();
             }
         }
     }
