@@ -109,13 +109,13 @@ public abstract class P2PSeedNodeSnapshotBase extends Metric implements MessageL
         super.configure(properties);
 
         if (hashes.isEmpty()) {
-            File metricsDir = new File(Monitor.getAppDir(), "metric_" + getName());
+            String name = getName();
+            File metricsDir = new File(Monitor.getAppDir(), "metric_" + name);
             if (!metricsDir.exists()) {
                 if (!metricsDir.mkdir()) {
                     log.error("Make metricsDir failed. Path: {}", metricsDir);
                 }
             }
-            log.error("metricsDir " + metricsDir.getAbsolutePath());
             try {
                 CorePersistenceProtoResolver persistenceProtoResolver = new CorePersistenceProtoResolver(null, null);
 
@@ -123,8 +123,7 @@ public abstract class P2PSeedNodeSnapshotBase extends Metric implements MessageL
                 TradeStatistics3Store tradeStatistics3Store = new TradeStatistics3Store();
                 PersistenceManager<TradeStatistics3Store> tradeStatistics3PersistenceManager = new PersistenceManager<>(metricsDir,
                         persistenceProtoResolver, null);
-                String fileName = getName() + "_" + tradeStatistics3Store.getDefaultStorageFileName();
-                log.error("fileName " + fileName);
+                String fileName = name + "_" + tradeStatistics3Store.getDefaultStorageFileName();
                 tradeStatistics3PersistenceManager.initialize(tradeStatistics3Store,
                         fileName,
                         PersistenceManager.Source.NETWORK);
@@ -138,7 +137,7 @@ public abstract class P2PSeedNodeSnapshotBase extends Metric implements MessageL
                 AccountAgeWitnessStore accountAgeWitnessStore = new AccountAgeWitnessStore();
                 PersistenceManager<AccountAgeWitnessStore> accountAgeWitnessPersistenceManager = new PersistenceManager<>(metricsDir,
                         persistenceProtoResolver, null);
-                fileName = getName() + "_" + accountAgeWitnessStore.getDefaultStorageFileName();
+                fileName = name + "_" + accountAgeWitnessStore.getDefaultStorageFileName();
                 accountAgeWitnessPersistenceManager.initialize(accountAgeWitnessStore,
                         fileName,
                         PersistenceManager.Source.NETWORK);
