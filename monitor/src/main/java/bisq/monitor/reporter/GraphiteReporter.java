@@ -91,27 +91,16 @@ public class GraphiteReporter extends Reporter {
                 + (key.isEmpty() ? "" : "." + key)
                 + " " + value + " " + Long.parseLong(timeInMilliseconds) / 1000 + "\n";
 
-        if (socket == null) {
-            createSocket();
-        }
-        if (socket != null) {
+        try {
+            NodeAddress nodeAddress = OnionParser.getNodeAddress(configuration.getProperty("serviceUrl"));
+            socket = nodeAddress.getFullAddress().contains(".onion") ?
+                    new TorSocket(nodeAddress.getHostName(), nodeAddress.getPort()) :
+                    new Socket(nodeAddress.getHostName(), nodeAddress.getPort());
+
             try (OutputStream outputStream = socket.getOutputStream()) {
                 outputStream.write(report.getBytes(Charsets.UTF_8));
             } catch (IOException e) {
                 e.printStackTrace();
-            }
-        } else {
-            log.debug("No socket setup. That might be expected for dev setup.");
-        }
-    }
-
-    protected void createSocket() {
-        try {
-            NodeAddress nodeAddress = OnionParser.getNodeAddress(configuration.getProperty("serviceUrl"));
-            if (nodeAddress.getFullAddress().contains(".onion")) {
-                socket = new TorSocket(nodeAddress.getHostName(), nodeAddress.getPort());
-            } else {
-                socket = new Socket(nodeAddress.getHostName(), nodeAddress.getPort());
             }
         } catch (IOException e) {
             //e.printStackTrace();
