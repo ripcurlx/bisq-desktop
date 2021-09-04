@@ -384,7 +384,7 @@ public class WalletsSetup {
     private void configPeerNodesForRegTestServer() {
         try {
             if (RegTestHost.HOST.endsWith(".onion")) {
-                walletConfig.setPeerNodes(new PeerAddress(RegTestHost.HOST, params.getPort()));
+                walletConfig.setPeerNodes(new PeerAddress(params, RegTestHost.HOST, params.getPort()));
             } else {
                 walletConfig.setPeerNodes(new PeerAddress(params, InetAddress.getByName(RegTestHost.HOST), params.getPort()));
             }
@@ -403,7 +403,7 @@ public class WalletsSetup {
         int minBroadcastConnections = btcNodesSetupPreferences.calculateMinBroadcastConnections(nodes);
         walletConfig.setMinBroadcastConnections(minBroadcastConnections);
 
-        BtcNodesRepository repository = new BtcNodesRepository(nodes);
+        BtcNodesRepository repository = new BtcNodesRepository(nodes, params);
         boolean isUseClearNodesWithProxies = (useAllProvidedNodes || btcNodesSetupPreferences.isUseCustomNodes());
         List<PeerAddress> peers = repository.getPeerAddresses(proxy, isUseClearNodesWithProxies);
 

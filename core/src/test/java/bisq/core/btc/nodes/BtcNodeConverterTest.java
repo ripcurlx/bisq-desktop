@@ -22,7 +22,9 @@ import bisq.core.btc.nodes.BtcNodes.BtcNode;
 
 import bisq.network.DnsLookupException;
 
+import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.core.PeerAddress;
+import org.bitcoinj.params.RegTestParams;
 
 import com.runjva.sourceforge.jsocks.protocol.Socks5Proxy;
 
@@ -45,9 +47,10 @@ public class BtcNodeConverterTest {
         //InetAddress inetAddress = mock(InetAddress.class);
 
         Facade facade = mock(Facade.class);
+        NetworkParameters params = RegTestParams.get();
         //when(facade.onionHostToInetAddress(any())).thenReturn(inetAddress);
 
-        PeerAddress peerAddress = new BtcNodeConverter(facade).convertOnionHost(node);
+        PeerAddress peerAddress = new BtcNodeConverter(facade, params).convertOnionHost(node);
         // noinspection ConstantConditions
         assertEquals(node.getOnionAddress(), peerAddress.getHostname());
     }
@@ -58,8 +61,9 @@ public class BtcNodeConverterTest {
 
         BtcNode node = mock(BtcNode.class);
         when(node.getHostNameOrAddress()).thenReturn(ip);
+        NetworkParameters params = RegTestParams.get();
 
-        PeerAddress peerAddress = new BtcNodeConverter().convertClearNode(node);
+        PeerAddress peerAddress = new BtcNodeConverter(params).convertClearNode(node);
         // noinspection ConstantConditions
         InetAddress inetAddress = peerAddress.getAddr();
         assertEquals(ip, inetAddress.getHostAddress());
@@ -70,12 +74,13 @@ public class BtcNodeConverterTest {
         InetAddress expected = mock(InetAddress.class);
 
         Facade facade = mock(Facade.class);
+        NetworkParameters params = RegTestParams.get();
         when(facade.torLookup(any(), anyString())).thenReturn(expected);
 
         BtcNode node = mock(BtcNode.class);
         when(node.getHostNameOrAddress()).thenReturn("aaa.onion");
 
-        PeerAddress peerAddress = new BtcNodeConverter(facade).convertWithTor(node, mock(Socks5Proxy.class));
+        PeerAddress peerAddress = new BtcNodeConverter(facade, params).convertWithTor(node, mock(Socks5Proxy.class));
 
         // noinspection ConstantConditions
         assertEquals(expected, peerAddress.getAddr());
