@@ -17,7 +17,6 @@
 
 package bisq.core.btc.nodes;
 
-import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.core.PeerAddress;
 
 import com.runjva.sourceforge.jsocks.protocol.Socks5Proxy;
@@ -34,8 +33,8 @@ public class BtcNodesRepository {
     private final BtcNodeConverter converter;
     private final List<BtcNodes.BtcNode> nodes;
 
-    public BtcNodesRepository(List<BtcNodes.BtcNode> nodes, NetworkParameters params) {
-        this(new BtcNodeConverter(params), nodes);
+    public BtcNodesRepository(List<BtcNodes.BtcNode> nodes) {
+        this(new BtcNodeConverter(), nodes);
     }
 
     public BtcNodesRepository(BtcNodeConverter converter, List<BtcNodes.BtcNode> nodes) {
