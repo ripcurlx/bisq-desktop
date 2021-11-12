@@ -112,7 +112,13 @@ public abstract class P2PSeedNodeSnapshotBase extends Metric implements MessageL
         super.configure(properties);
 
         if (hashes.isEmpty() && configuration.getProperty(DATABASE_DIR) != null) {
-            File dir = new File(configuration.getProperty(DATABASE_DIR));
+            String absPath = new File("").getAbsolutePath();
+            File dir = new File(absPath, configuration.getProperty(DATABASE_DIR));
+            if (!dir.exists()) {
+                if (!dir.mkdir()) {
+                    log.error("Make dir failed. Path: {}", dir);
+                }
+            }
             String networkPostfix = "_" + BaseCurrencyNetwork.values()[Version.getBaseCurrencyNetwork()].toString();
             try {
                 CorePersistenceProtoResolver persistenceProtoResolver = new CorePersistenceProtoResolver(null, null);
@@ -194,8 +200,8 @@ public abstract class P2PSeedNodeSnapshotBase extends Metric implements MessageL
                         @Override
                         public void onFailure(@NotNull Throwable throwable) {
                             gate.proceed();
-                            log.error(
-                                    "Sending {} failed. That is expected if the peer is offline.\n\tException={}", message.getClass().getSimpleName(), throwable.getMessage());
+                            log.error("Sending {} to {} failed. That is expected if the peer is offline.\n\tException={}",
+                                    message.getClass().getSimpleName(), target.getFullAddress(), throwable.getMessage());
                         }
                     }, MoreExecutors.directExecutor());
 

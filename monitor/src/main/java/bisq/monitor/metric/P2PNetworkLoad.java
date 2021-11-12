@@ -113,10 +113,17 @@ public class P2PNetworkLoad extends Metric implements MessageListener, SetupList
             // prepare the gate
             hsReady.engage();
 
+            String absPath = new File("").getAbsolutePath();
+            File torHiddenServiceDirAbs = new File(absPath, this.torHiddenServiceDir.getPath());
+            if (!torHiddenServiceDirAbs.exists()) {
+                if (!torHiddenServiceDirAbs.mkdir()) {
+                    log.error("Make dir failed. Path: {}", torHiddenServiceDirAbs);
+                }
+            }
             // start the network node
             networkNode = new TorNetworkNode(Integer.parseInt(configuration.getProperty(TOR_PROXY_PORT, "9053")),
                     new CoreNetworkProtoResolver(Clock.systemDefaultZone()), false,
-                    new AvailableTor(Monitor.TOR_WORKING_DIR, torHiddenServiceDir.getName()), null);
+                    new AvailableTor(Monitor.TOR_WORKING_DIR, torHiddenServiceDirAbs.getName()), null);
             networkNode.start(this);
 
             // wait for the HS to be published
@@ -132,7 +139,7 @@ public class P2PNetworkLoad extends Metric implements MessageListener, SetupList
                         networkProtoResolver);
                 DefaultSeedNodeRepository seedNodeRepository = new DefaultSeedNodeRepository(config);
                 PeerManager peerManager = new PeerManager(networkNode, seedNodeRepository, new ClockWatcher(),
-                        new PersistenceManager<>(torHiddenServiceDir, persistenceProtoResolver, corruptedStorageFileHandler), maxConnections);
+                        new PersistenceManager<>(torHiddenServiceDirAbs, persistenceProtoResolver, corruptedStorageFileHandler), maxConnections);
 
                 // init file storage
                 peerManager.readPersisted(() -> {
