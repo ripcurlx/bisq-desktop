@@ -75,10 +75,12 @@ public class Monitor {
     public static void shutDown() {
         log.info("Graceful shutdown started");
 
+        // We must not call System.exit() or Runtime.getRuntime().exit() as that would lead to a deadLock as we are
+        // called from the shutDownHook
         UserThread.runAfter(() -> {
             log.info("Graceful shutdown not completed after 5 sec. We exit now.");
-            System.exit(0);
-        }, 5);
+            Runtime.getRuntime().halt(0);
+        }, 10);
 
 
         log.info("Shutdown metrics...");
@@ -91,7 +93,6 @@ public class Monitor {
         }
 
         log.info("Graceful shutdown complete");
-        System.exit(0);
     }
 
     private final List<Metric> metrics = new ArrayList<>();
@@ -148,16 +149,7 @@ public class Monitor {
             log.info("Signal {} received. We shut down.", signal.getName());
             Monitor.shutDown();
         });
-        Signal.handle(new Signal("HUP"), signal -> {
-            log.info("Signal {} received. We shut down.", signal.getName());
-            Monitor.shutDown();
-        });
-        Signal.handle(new Signal("ABRT"), signal -> {
-            log.info("Signal {} received. We shut down.", signal.getName());
-            Monitor.shutDown();
-        });
 
-        // exit Metrics gracefully on shutdown
         Runtime.getRuntime().addShutdownHook(new Thread(Monitor::shutDown, "Monitor Shutdown Hook "));
     }
 
