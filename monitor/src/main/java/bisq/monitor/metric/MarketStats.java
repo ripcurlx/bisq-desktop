@@ -44,7 +44,7 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 public class MarketStats extends Metric {
-    private static final String MARKETS_BISQ_NETWORK = "https://markets.bisq.network";
+    private static final String MARKETS_BISQ_NETWORK = "https://bisq.markets/";
     // poor mans JSON parser
     private final Pattern marketPattern = Pattern.compile("\"market\" ?: ?\"([a-z_]+)\"");
     private final Pattern amountPattern = Pattern.compile("\"amount\" ?: ?\"([\\d\\.]+)\"");
