@@ -80,7 +80,7 @@ class P2PRoundTripTimeTests {
     @BeforeAll
     static void setup() throws TorCtlException {
         // simulate the tor instance available to all metrics
-        Tor.setDefault(new NativeTor(Monitor.TOR_WORKING_DIR));
+        Tor.setDefault(new NativeTor(Monitor.getTorDir()));
     }
 
     @ParameterizedTest

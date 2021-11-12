@@ -161,7 +161,7 @@ public abstract class P2PSeedNodeSnapshotBase extends Metric implements MessageL
         // start the network node
         final NetworkNode networkNode = new TorNetworkNode(Integer.parseInt(configuration.getProperty(TOR_PROXY_PORT, "9054")),
                 new CoreNetworkProtoResolver(Clock.systemDefaultZone()), false,
-                new AvailableTor(Monitor.TOR_WORKING_DIR, "unused"), null);
+                new AvailableTor(Monitor.getTorDir(), "unused"), null);
         // we do not need to start the networkNode, as we do not need the HS
         //networkNode.start(this);
 

@@ -29,22 +29,28 @@ import bisq.monitor.metric.TorStartupTime;
 import bisq.monitor.reporter.ConsoleReporter;
 import bisq.monitor.reporter.GraphiteReporter;
 
+import bisq.common.UserThread;
 import bisq.common.app.Capabilities;
 import bisq.common.app.Capability;
+import bisq.common.util.Utilities;
 
 import org.berndpruenster.netlayer.tor.NativeTor;
 import org.berndpruenster.netlayer.tor.Tor;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-
-import static com.google.common.base.Preconditions.checkNotNull;
 
 
 
@@ -57,30 +63,123 @@ import sun.misc.Signal;
  */
 @Slf4j
 public class Monitor {
-
-    public static final File TOR_WORKING_DIR = new File("monitor/work/monitor-tor");
-    private static String[] args = {};
+    public static File appDir;
+    @Getter
+    public static File torDir;
 
     public static void main(String[] args) throws Throwable {
-        Monitor.args = args;
-        new Monitor().start();
+        new Monitor().start(args);
     }
 
-    /**
-     * A list of all active {@link Metric}s
-     */
+    public static void shutDown() {
+        log.info("Graceful shutdown started");
+
+        UserThread.runAfter(() -> {
+            log.info("Graceful shutdown not completed after 5 sec. We exit now.");
+            System.exit(0);
+        }, 5);
+
+
+        log.info("Shutdown metrics...");
+        Metric.haltAllMetrics();
+
+        Tor tor = Tor.getDefault();
+        if (tor != null) {
+            log.info("Shutdown tor...");
+            tor.shutdown();
+        }
+
+        log.info("Graceful shutdown complete");
+        System.exit(0);
+    }
+
     private final List<Metric> metrics = new ArrayList<>();
 
-    /**
-     * Starts up all configured Metrics.
-     *
-     * @throws Throwable in case something goes wrong
-     */
-    private void start() throws Throwable {
+    private void start(String[] args) throws Throwable {
+        appDir = new File(Utilities.getUserDataDir(), "bisq-monitor");
+        torDir = new File(appDir, "tor");
+        log.info("App dir: {}", appDir);
 
-        // start Tor
-        Tor.setDefault(new NativeTor(TOR_WORKING_DIR, null, null, false));
+        setupUserThread();
 
+        setupCapabilities();
+
+        setupShutDownHandlers();
+
+        // blocking call
+        startTor();
+
+        Properties properties = getProperties(args);
+
+        Reporter reporter = "true".equals(properties.getProperty("System.useConsoleReporter", "false")) ?
+                new ConsoleReporter() :
+                new GraphiteReporter();
+
+        metrics.add(new TorStartupTime(reporter));
+        metrics.add(new TorRoundTripTime(reporter));
+        metrics.add(new TorHiddenServiceStartupTime(reporter));
+        metrics.add(new P2PRoundTripTime(reporter));
+        metrics.add(new P2PNetworkLoad(reporter));
+        metrics.add(new P2PSeedNodeSnapshot(reporter));
+        metrics.add(new P2PMarketStats(reporter));
+        metrics.add(new PriceNodeStats(reporter));
+        metrics.add(new MarketStats(reporter));
+
+        configureAllMetrics(properties, metrics);
+
+        // prepare configuration reload
+        // Note that this is most likely only work on Linux
+        Signal.handle(new Signal("USR1"), signal -> {
+            try {
+                configureAllMetrics(getProperties(args), metrics);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
+    }
+
+    private void setupShutDownHandlers() {
+        Signal.handle(new Signal("INT"), signal -> {
+            log.info("Signal {} received. We shut down.", signal.getName());
+            Monitor.shutDown();
+        });
+        Signal.handle(new Signal("TERM"), signal -> {
+            log.info("Signal {} received. We shut down.", signal.getName());
+            Monitor.shutDown();
+        });
+        Signal.handle(new Signal("HUP"), signal -> {
+            log.info("Signal {} received. We shut down.", signal.getName());
+            Monitor.shutDown();
+        });
+        Signal.handle(new Signal("ABRT"), signal -> {
+            log.info("Signal {} received. We shut down.", signal.getName());
+            Monitor.shutDown();
+        });
+
+        // exit Metrics gracefully on shutdown
+        Runtime.getRuntime().addShutdownHook(new Thread(Monitor::shutDown, "Monitor Shutdown Hook "));
+    }
+
+    private void setupUserThread() {
+        ThreadFactory threadFactory = new ThreadFactoryBuilder()
+                .setNameFormat(this.getClass().getSimpleName())
+                .setDaemon(true)
+                .build();
+        UserThread.setExecutor(Executors.newSingleThreadExecutor(threadFactory));
+    }
+
+    private void configureAllMetrics(Properties properties, List<Metric> metrics) {
+        metrics.forEach(metric -> metric.configure(properties));
+    }
+
+    private void startTor() throws org.berndpruenster.netlayer.tor.TorCtlException {
+        // TODO maybe better to create on demand from inside metrics
+        long ts = System.currentTimeMillis();
+        Tor.setDefault(new NativeTor(torDir, null, null, false));
+        log.info("Starting tor took {} ms", System.currentTimeMillis() - ts);
+    }
+
+    private void setupCapabilities() {
         //noinspection deprecation,deprecation,deprecation,deprecation,deprecation,deprecation,deprecation,deprecation
         Capabilities.app.addAll(Capability.TRADE_STATISTICS,
                 Capability.TRADE_STATISTICS_2,
@@ -93,89 +192,25 @@ public class Monitor {
                 Capability.REFUND_AGENT,
                 Capability.MEDIATION,
                 Capability.TRADE_STATISTICS_3);
-
-        // assemble Metrics
-        // - create reporters
-        Reporter graphiteReporter = new GraphiteReporter();
-
-        // only use ConsoleReporter if requested (for debugging for example)
-        Properties properties = getProperties();
-        if ("true".equals(properties.getProperty("System.useConsoleReporter", "false")))
-            graphiteReporter = new ConsoleReporter();
-
-        // - add available metrics with their reporters
-        metrics.add(new TorStartupTime(graphiteReporter));
-        metrics.add(new TorRoundTripTime(graphiteReporter));
-        metrics.add(new TorHiddenServiceStartupTime(graphiteReporter));
-        metrics.add(new P2PRoundTripTime(graphiteReporter));
-        metrics.add(new P2PNetworkLoad(graphiteReporter));
-        metrics.add(new P2PSeedNodeSnapshot(graphiteReporter));
-        metrics.add(new P2PMarketStats(graphiteReporter));
-        metrics.add(new PriceNodeStats(graphiteReporter));
-        metrics.add(new MarketStats(graphiteReporter));
-
-        // prepare configuration reload
-        // Note that this is most likely only work on Linux
-        Signal.handle(new Signal("USR1"), signal -> {
-            try {
-                configure();
-            } catch (Exception e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
-        });
-
-        // configure Metrics
-        // - which also starts the metrics if appropriate
-        configure();
-
-        // exit Metrics gracefully on shutdown
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                    // set the name of the Thread for debugging purposes
-                    log.info("system shutdown initiated");
-
-                    log.info("shutting down active metrics...");
-                    Metric.haltAllMetrics();
-
-                    try {
-                        log.info("shutting down tor...");
-                        Tor tor = Tor.getDefault();
-                        checkNotNull(tor, "tor must not be null");
-                        tor.shutdown();
-                    } catch (Throwable ignore) {
-                    }
-
-                    log.info("system halt");
-                }, "Monitor Shutdown Hook ")
-        );
     }
 
-    /**
-     * Reload the configuration from disk.
-     *
-     * @throws Exception if something goes wrong
-     */
-    private void configure() throws Exception {
-        Properties properties = getProperties();
-        for (Metric current : metrics)
-            current.configure(properties);
-    }
 
     /**
      * Overloads a default set of properties with a file if given
      *
      * @return a set of properties
-     * @throws Exception in case something goes wrong
+     * @throws IOException in case something goes wrong
      */
-    private Properties getProperties() throws Exception {
+    private Properties getProperties(String[] args) throws IOException {
         Properties result = new Properties();
 
         // if we have a config file load the config file, else, load the default config
         // from the resources
-        if (args.length > 0)
+        if (args.length > 0) {
             result.load(new FileInputStream(args[0]));
-        else
+        } else {
             result.load(Monitor.class.getClassLoader().getResourceAsStream("metrics.properties"));
+        }
 
         return result;
     }
